@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>File Upload and Caching</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/web/pdf_viewer.css">
+    <style>
+        #pdf {
+            height: 600px;
+            width: 100%;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container mt-5">
+        <h2 class="mb-4">Upload and Cache Large Files</h2>
+        <div class="card">
+            <div class="card-body">
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label for="fileInput">Select a file to upload:</label>
+                        <input type="file" class="form-control-file" id="fileInput">
+                    </div>
+                    <div class="progress my-2" role="progressbar" aria-label="Example with label" aria-valuenow="0"
+                        aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar" style="width: 0%">0%</div>
+                    </div>
+                    <button type="button" id="uploadButton" class="btn btn-primary">Upload & Cache</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="my-4">
+            <button id="viewPDFBtn" class="btn btn-info">PDF View</button>
+            <div id="pdf"></div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfobject/2.3.0/pdfobject.min.js"></script>
+    <script src="./file_cache_indexeddb.js"></script>
+
+    <script>
+        // Handle file upload and cache it using IndexedDB
+        document.getElementById('uploadButton').addEventListener('click', async function () {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            const progressBar = document.querySelector('.progress-bar');
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+
+            if (file) {
+                // Generate a random 4-digit key
+                const key = Math.floor(1000 + Math.random() * 9000).toString();
+                console.log("File Key: ", key);
+                try {
+                    const db = await openDatabase();
+                    await addFileToStore(db, file, key);
+                    progressBar.style.width = '100%';
+                    progressBar.textContent = '100%';
+                    alert('File uploaded and cached with key: ' + key);
+                } catch (error) {
+                    console.error('Error uploading file:', error);
+                    alert('Failed to upload file.');
+                }
+            } else {
+                alert('Please select a file first.');
+            }
+        });
+
+        document.getElementById('viewPDFBtn').addEventListener('click', async function () {
+            const fileKey = prompt('Enter the 4-digit key of the PDF file to view:');
+            if (fileKey) {
+                try {
+                    const db = await openDatabase();
+                    const fileData = await getFileFromStore(db, fileKey);
+
+                    if (fileData && fileData.filetype === 'application/pdf') {
+                        const fileBlob = new Blob([fileData.filecontent], { type: fileData.filetype });
+                        const fileURL = URL.createObjectURL(fileBlob);
+
+                        // Display the PDF
+                        PDFObject.embed(fileURL, "#pdf", {
+
+                            forcePDFJS: true,
+                            PDFJS_URL: "/pdfjs/web/viewer.html"
+                        });
+                    } else {
+                        alert('File not found or is not a PDF.');
+                    }
+                } catch (error) {
+                    console.error('Error retrieving file:', error);
+                    alert('Failed to retrieve file.');
+                }
+            }
+        });
+
+    </script>
+</body>
+
+</html>
